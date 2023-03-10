@@ -40,7 +40,7 @@
 @ECHO                Warning: Changing destdir path will not delete the old destdir.
 @ECHO                Default: %PS_DESTDIR_DEFAULT_MSG%
 @ECHO  -p -PRIORITY  Build CPU priority
-@ECHO                Default: normal
+@ECHO                Default: low
 @ECHO.
 @ECHO  Examples:
 @ECHO.
@@ -89,7 +89,7 @@ SET PS_RUN=none
 SET PS_DESTDIR=
 SET PS_VERSION=
 SET PS_PRODUCT=%PS_PRODUCT_DEFAULT%
-SET PS_PRIORITY=normal
+SET PS_PRIORITY=low
 CALL :RESOLVE_DESTDIR_CACHE
 
 REM Set up parameters used by help menu
