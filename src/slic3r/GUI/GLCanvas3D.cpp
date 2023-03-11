@@ -3141,7 +3141,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         }
     }
     else if (evt.Dragging() && evt.LeftIsDown() && !evt.CmdDown() && m_layers_editing.state == LayersEditing::Unknown &&
-             m_mouse.drag.move_volume_idx != -1 && m_mouse.is_start_position_3D_defined()) {
+             m_mouse.drag.move_volume_idx != -1 && m_mouse.is_start_position_3D_defined() &&
+             m_selection.get_mode() != Selection::EMode::Volume) {
         if (!m_mouse.drag.move_requires_threshold) {
             m_mouse.dragging = true;
             Vec3d cur_pos = m_mouse.drag.start_position_3D;
