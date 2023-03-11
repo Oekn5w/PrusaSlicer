@@ -3230,8 +3230,8 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
             }
         }
-        else if (evt.MiddleIsDown() || evt.RightIsDown()) {
-            // If dragging over blank area with right/middle button, pan.
+        else if (evt.RightIsDown()) {
+            // If dragging with right button, pan.
             if (m_mouse.is_start_position_2D_defined()) {
                 // get point in model space at Z = 0
                 float z = 0.0f;
@@ -3250,6 +3250,27 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
 
             m_mouse.drag.start_position_2D = pos;
+        }
+        else if (evt.MiddleIsDown()) {
+            // If dragging with middle button, rotate.
+            if (m_mouse.is_start_position_3D_defined()) {
+                const Vec3d rot = (Vec3d(pos.x(), pos.y(), 0.0) - m_mouse.drag.start_position_3D) * (PI * TRACKBALLSIZE / 180.0);
+                if (wxGetApp().app_config->get_bool("use_free_camera"))
+                    // Virtual track ball (similar to the 3DConnexion mouse).
+                    wxGetApp().plater()->get_camera().rotate_local_around_target(Vec3d(rot.y(), rot.x(), 0.0));
+                else {
+                    // Forces camera right vector to be parallel to XY plane in case it has been misaligned using the 3D mouse free rotation.
+                    // It is cheaper to call this function right away instead of testing wxGetApp().plater()->get_mouse3d_controller().connected(),
+                    // which checks an atomics (flushes CPU caches).
+                    // See GH issue #3816.
+                    Camera& camera = wxGetApp().plater()->get_camera();
+                    camera.recover_from_free_camera();
+                    camera.rotate_on_sphere(rot.x(), rot.y(), current_printer_technology() != ptSLA);
+                }
+
+                m_dirty = true;
+            }
+            m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
         }
     }
     else if (evt.LeftUp() || evt.MiddleUp() || evt.RightUp()) {
