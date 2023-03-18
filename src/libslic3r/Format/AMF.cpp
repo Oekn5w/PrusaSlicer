@@ -64,11 +64,12 @@ namespace Slic3r
 
 struct AMFParserContext
 {
-    AMFParserContext(XML_Parser parser, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model) :
+    AMFParserContext(XML_Parser parser, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, std::string const &filename) :
         m_parser(parser),
         m_model(*model), 
         m_config(config),
-        m_config_substitutions(config_substitutions)
+        m_config_substitutions(config_substitutions),
+        m_filename(filename)
     {
         m_path.reserve(12);
     }
@@ -234,6 +235,7 @@ struct AMFParserContext
     // Error code returned by the application side of the parser. In that case the expat may not reliably deliver the error state
     // after returning from XML_Parse() function, thus we keep the error state here.
     bool                     m_error { false };
+    std::string              m_filename;
     std::string              m_error_message;
     // Model to receive objects extracted from an AMF file.
     Model                   &m_model;
@@ -798,8 +800,18 @@ void AMFParserContext::endElement(const char * /* name */)
                     m_volume->set_type(ModelVolume::type_from_string(m_value[1]));
                 else if (strcmp(opt_key, "matrix") == 0)
                     m_volume_transform = Slic3r::Geometry::transform3d_from_string(m_value[1]);
-                else if (strcmp(opt_key, "source_file") == 0)
+                else if (strcmp(opt_key, "source_file") == 0) {
+                    std::string resolved_file = m_value[1];
+                    auto temp_path = boost::filesystem::path(resolved_file);
+                    if(temp_path.is_relative()) {
+                        boost::system::error_code ec;
+                        temp_path = boost::filesystem::canonical(temp_path, boost::filesystem::path(m_filename).parent_path(), ec);
+                        if (!ec) // no error so file does exist, otherwise fall back to what's in the key
+                            resolved_file = temp_path.string();
+                    }
+                    m_volume->source.input_file = resolved_file;
                     m_volume->source.input_file = m_value[1];
+                }
                 else if (strcmp(opt_key, "source_object_id") == 0)
                     m_volume->source.object_idx = ::atoi(m_value[1].c_str());
                 else if (strcmp(opt_key, "source_volume_id") == 0)
@@ -882,7 +894,7 @@ bool load_amf_file(const char *path, DynamicPrintConfig *config, ConfigSubstitut
         return false;
     }
 
-    AMFParserContext ctx(parser, config, config_substitutions, model);
+    AMFParserContext ctx(parser, config, config_substitutions, model, path);
     XML_SetUserData(parser, (void*)&ctx);
     XML_SetElementHandler(parser, AMFParserContext::startElement, AMFParserContext::endElement);
     XML_SetCharacterDataHandler(parser, AMFParserContext::characters);
@@ -929,7 +941,7 @@ bool load_amf_file(const char *path, DynamicPrintConfig *config, ConfigSubstitut
     return result;
 }
 
-bool extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, bool check_version)
+bool extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, bool check_version, std::string const &filename)
 {
     if (stat.m_uncomp_size == 0)
     {
@@ -945,7 +957,7 @@ bool extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_fi
         return false;
     }
 
-    AMFParserContext ctx(parser, config, config_substitutions, model);
+    AMFParserContext ctx(parser, config, config_substitutions, model, filename);
     XML_SetUserData(parser, (void*)&ctx);
     XML_SetElementHandler(parser, AMFParserContext::startElement, AMFParserContext::endElement);
     XML_SetCharacterDataHandler(parser, AMFParserContext::characters);
@@ -1031,7 +1043,7 @@ bool load_amf_archive(const char* path, DynamicPrintConfig* config, ConfigSubsti
             {
                 try
                 {
-                    if (!extract_model_from_archive(archive, stat, config, config_substitutions, model, check_version))
+                    if (!extract_model_from_archive(archive, stat, config, config_substitutions, model, check_version, path))
                     {
                         close_zip_reader(&archive);
                         BOOST_LOG_TRIVIAL(error) << "Archive does not contain a valid model";
@@ -1243,7 +1255,14 @@ bool store_amf(const char* path, Model* model, const DynamicPrintConfig* config,
             }
             stream << "</metadata>\n";
             if (!volume->source.input_file.empty()) {
-                std::string input_file = xml_escape(fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
+                std::string input_file = "";
+                auto temp_path = boost::filesystem::path(volume->source.input_file);
+                if (fullpath_sources) {
+                    if (boost::filesystem::exists(temp_path))
+                        input_file = xml_escape(boost::filesystem::relative(temp_path, boost::filesystem::path(export_path).parent_path()).string());
+                }
+                if (input_file.empty())
+                    input_file = xml_escape(temp_path.filename().string());
                 stream << "        <metadata type=\"slic3r.source_file\">" << input_file << "</metadata>\n";
                 stream << "        <metadata type=\"slic3r.source_object_id\">" << volume->source.object_idx << "</metadata>\n";
                 stream << "        <metadata type=\"slic3r.source_volume_id\">" << volume->source.volume_idx << "</metadata>\n";

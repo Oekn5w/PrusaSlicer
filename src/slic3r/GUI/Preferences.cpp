@@ -282,7 +282,7 @@ void PreferencesDialog::build()
 
 		// Please keep in sync with ConfigWizard
 		append_bool_option(m_optgroup_general, "export_sources_full_pathnames",
-			L("Export sources full pathnames to 3mf and amf"),
+			L("Export source's relative paths to 3mf and amf"),
 			L("If enabled, allows the Reload from disk command to automatically find and load the files when invoked."),
 			app_config->get_bool("export_sources_full_pathnames"));
 

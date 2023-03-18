@@ -491,6 +491,7 @@ namespace Slic3r {
         std::string m_curr_metadata_name;
         std::string m_curr_characters;
         std::string m_name;
+        std::string m_filename;
 
     public:
         _3MF_Importer();
@@ -615,6 +616,7 @@ namespace Slic3r {
         , m_curr_metadata_name("")
         , m_curr_characters("")
         , m_name("")
+        , m_filename("")
     {
     }
 
@@ -670,6 +672,8 @@ namespace Slic3r {
 
     bool _3MF_Importer::_load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions)
     {
+        m_filename = filename;
+
         mz_zip_archive archive;
         mz_zip_zero_struct(&archive);
 
@@ -2251,8 +2255,17 @@ namespace Slic3r {
 					volume->set_type(ModelVolumeType::PARAMETER_MODIFIER);
                 else if (metadata.key == VOLUME_TYPE_KEY)
                     volume->set_type(ModelVolume::type_from_string(metadata.value));
-                else if (metadata.key == SOURCE_FILE_KEY)
-                    volume->source.input_file = metadata.value;
+                else if (metadata.key == SOURCE_FILE_KEY) {
+                    std::string resolved_file = metadata.value;
+                    auto temp_path = boost::filesystem::path(resolved_file);
+                    if(temp_path.is_relative()) {
+                        boost::system::error_code ec;
+                        temp_path = boost::filesystem::canonical(temp_path, boost::filesystem::path(m_filename).parent_path(), ec);
+                        if (!ec) // no error so file does exist, otherwise fall back to what's in the key
+                            resolved_file = temp_path.string();
+                    }
+                    volume->source.input_file = resolved_file;
+                }
                 else if (metadata.key == SOURCE_OBJECT_ID_KEY)
                     volume->source.object_idx = ::atoi(metadata.value.c_str());
                 else if (metadata.key == SOURCE_VOLUME_ID_KEY)
@@ -2367,6 +2380,7 @@ namespace Slic3r {
         typedef std::map<int, ObjectData> IdToObjectDataMap;
 
         bool m_fullpath_sources{ true };
+        std::string m_filename { "" };
         bool m_zip64 { true };
 
     public:
@@ -2401,6 +2415,8 @@ namespace Slic3r {
 
     bool _3MF_Exporter::_save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const ThumbnailData* thumbnail_data)
     {
+        m_filename = filename;
+
         mz_zip_archive archive;
         mz_zip_zero_struct(&archive);
 
@@ -3291,9 +3307,16 @@ namespace Slic3r {
 
                     // stores volume's source data
                     {
-                        std::string input_file = xml_escape(m_fullpath_sources ? volume->source.input_file : boost::filesystem::path(volume->source.input_file).filename().string());
                         std::string prefix = std::string("   <") + METADATA_TAG + " " + TYPE_ATTR + "=\"" + VOLUME_TYPE + "\" " + KEY_ATTR + "=\"";
                         if (! volume->source.input_file.empty()) {
+                            std::string input_file = "";
+                            auto temp_path = boost::filesystem::path(volume->source.input_file);
+                            if (m_fullpath_sources) {
+                                if (boost::filesystem::exists(temp_path))
+                                    input_file = xml_escape(boost::filesystem::relative(temp_path, boost::filesystem::path(m_filename).parent_path()).string());
+                            }
+                            if (input_file.empty())
+                                input_file = xml_escape(temp_path.filename().string());
                             stream << prefix << SOURCE_FILE_KEY      << "\" " << VALUE_ATTR << "=\"" << input_file << "\"/>\n";
                             stream << prefix << SOURCE_OBJECT_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.object_idx << "\"/>\n";
                             stream << prefix << SOURCE_VOLUME_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.volume_idx << "\"/>\n";
