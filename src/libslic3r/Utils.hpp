@@ -251,6 +251,9 @@ inline typename CONTAINER_TYPE::value_type& next_value_modulo(typename CONTAINER
 	return container[next_idx_modulo(idx, container.size())];
 }
 
+#ifdef WIN32
+extern std::string make_posix_path(std::string text);
+#endif // WIN32
 extern std::string xml_escape(std::string text, bool is_marked = false);
 extern std::string xml_escape_double_quotes_attribute_value(std::string text);
 

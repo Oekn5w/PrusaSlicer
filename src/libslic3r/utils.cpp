@@ -927,6 +927,24 @@ unsigned get_current_pid()
 #endif
 }
 
+#ifdef WIN32
+std::string make_posix_path(std::string text)
+{
+    std::string::size_type pos = 0;
+    std::string replacement = "/";
+    for (;;)
+    {
+        pos = text.find_first_of("\\", pos);
+        if (pos == std::string::npos)
+            break;
+
+        text.replace(pos, 1, replacement);
+        pos += replacement.size();
+    }
+    return text;
+}
+#endif // WIN32
+
 //FIXME this has potentially O(n^2) time complexity!
 std::string xml_escape(std::string text, bool is_marked/* = false*/)
 {
