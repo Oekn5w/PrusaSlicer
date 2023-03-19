@@ -2257,7 +2257,7 @@ namespace Slic3r {
                     volume->set_type(ModelVolume::type_from_string(metadata.value));
                 else if (metadata.key == SOURCE_FILE_KEY) {
                     std::string resolved_file = metadata.value;
-                    auto temp_path = boost::filesystem::path(resolved_file);
+                    auto temp_path = boost::filesystem::path(resolved_file).make_preferred();
                     if(temp_path.is_relative()) {
                         boost::system::error_code ec;
                         temp_path = boost::filesystem::canonical(temp_path, boost::filesystem::path(m_filename).parent_path(), ec);
@@ -3312,8 +3312,14 @@ namespace Slic3r {
                             std::string input_file = "";
                             auto temp_path = boost::filesystem::path(volume->source.input_file);
                             if (m_fullpath_sources) {
-                                if (boost::filesystem::exists(temp_path))
-                                    input_file = xml_escape(boost::filesystem::relative(temp_path, boost::filesystem::path(m_filename).parent_path()).string());
+                                if (boost::filesystem::exists(temp_path)) {
+                                    temp_path = boost::filesystem::relative(temp_path, boost::filesystem::path(m_filename).parent_path());
+#ifdef WIN32
+                                    input_file = xml_escape(make_posix_path(temp_path.string()));
+#else
+                                    input_file = xml_escape(temp_path.string());
+#endif // WIN32
+                                }
                             }
                             if (input_file.empty())
                                 input_file = xml_escape(temp_path.filename().string());

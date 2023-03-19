@@ -802,7 +802,7 @@ void AMFParserContext::endElement(const char * /* name */)
                     m_volume_transform = Slic3r::Geometry::transform3d_from_string(m_value[1]);
                 else if (strcmp(opt_key, "source_file") == 0) {
                     std::string resolved_file = m_value[1];
-                    auto temp_path = boost::filesystem::path(resolved_file);
+                    auto temp_path = boost::filesystem::path(resolved_file).make_preferred();
                     if(temp_path.is_relative()) {
                         boost::system::error_code ec;
                         temp_path = boost::filesystem::canonical(temp_path, boost::filesystem::path(m_filename).parent_path(), ec);
@@ -1258,8 +1258,14 @@ bool store_amf(const char* path, Model* model, const DynamicPrintConfig* config,
                 std::string input_file = "";
                 auto temp_path = boost::filesystem::path(volume->source.input_file);
                 if (fullpath_sources) {
-                    if (boost::filesystem::exists(temp_path))
-                        input_file = xml_escape(boost::filesystem::relative(temp_path, boost::filesystem::path(export_path).parent_path()).string());
+                    if (boost::filesystem::exists(temp_path)) {
+                        temp_path = boost::filesystem::relative(temp_path, boost::filesystem::path(export_path).parent_path());
+#ifdef WIN32
+                        input_file = xml_escape(make_posix_path(temp_path.string()));
+#else
+                        input_file = xml_escape(temp_path.string());
+#endif // WIN32
+                    }
                 }
                 if (input_file.empty())
                     input_file = xml_escape(temp_path.filename().string());
