@@ -1247,21 +1247,24 @@ void PrintConfigDef::init_fff_params()
     def->max = 100;
     def->set_enum_values(ConfigOptionDef::GUIType::f_enum_open, {
         { "0", "0%" },
+        { "1", "1%" },
+        { "2", "2%" },
+        { "3", "3%" },
+        { "4", "4%" },
         { "5", "5%" },
-        { "10", "10%" },
-        { "15", "15%" },
-        { "20", "20%" },
+        { "6", "6%" },
+        { "8", "8%" },
+        { "12", "12%" },
+        { "17", "17%" },
         { "25", "25%" },
         { "30", "30%" },
         { "40", "40%" },
         { "50", "50%" },
         { "60", "60%" },
-        { "70", "70%" },
         { "80", "80%" },
-        { "90", "90%" },
         { "100", "100%" }
     });
-    def->set_default_value(new ConfigOptionPercent(20));
+    def->set_default_value(new ConfigOptionPercent(25));
 
     def = this->add("fill_pattern", coEnum);
     def->label = L("Fill pattern");
