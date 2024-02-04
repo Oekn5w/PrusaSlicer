@@ -1513,12 +1513,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionStrings());
 
-    def = this->add("gcode_binary", coBool);
-    def->label = L("Export as binary G-code");
-    def->tooltip = L("Export G-code in binary format.");
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionBool(0));
-
     def = this->add("high_current_on_filament_swap", coBool);
     def->label = L("High extruder current on filament swap");
     def->tooltip = L("It may be beneficial to increase the extruder motor current during the filament exchange"
@@ -1793,6 +1787,13 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("The firmware supports stealth mode");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("binary_gcode", coBool);
+    def->label = L("Supports binary G-code");
+    def->tooltip = L("Enable, if the firmware supports binary G-code format (bgcode). "
+                     "To generate .bgcode files, make sure you have binary G-code enabled in Configuration->Preferences->Other.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("machine_limits_usage", coEnum);
     def->label = L("How to apply limits");
@@ -2319,7 +2320,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBools { false });
 
     def = this->add("retract_length", coFloats);
-    def->label = L("Length");
+    def->label = L("Retraction length");
     def->full_label = L("Retraction Length");
     def->tooltip = L("When retraction is triggered, filament is pulled back by the specified amount "
                    "(the length is measured on raw filament, before it enters the extruder).");
@@ -2336,13 +2337,48 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloats { 10. });
 
-    def = this->add("retract_lift", coFloats);
-    def->label = L("Lift Z");
-    def->tooltip = L("If you set this to a positive value, Z is quickly raised every time a retraction "
-                   "is triggered. When using multiple extruders, only the setting for the first extruder "
-                   "will be considered.");
+    def = this->add("travel_slope", coFloats);
+    def->label = L("Ramping slope angle");
+    def->tooltip = L("Slope of the ramp in the initial phase of the travel.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 90;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats{0.0});
+
+    def = this->add("travel_ramping_lift", coBools);
+    def->label = L("Use ramping lift");
+    def->tooltip = L("Generates a ramping lift instead of lifting the extruder directly upwards. "
+                     "The travel is split into two phases: the ramp and the standard horizontal travel. "
+                     "This option helps reduce stringing.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBools{ false });
+
+    def = this->add("travel_max_lift", coFloats);
+    def->label = L("Maximum ramping lift");
+    def->tooltip = L("Maximum lift height of the ramping lift. It may not be reached if the next position "
+                     "is close to the old one.");
     def->sidetext = L("mm");
-    def->set_default_value(new ConfigOptionFloats { 0. });
+    def->min = 0;
+    def->max_literal = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats{0.0});
+
+    def = this->add("travel_lift_before_obstacle", coBools);
+    def->label = L("Steeper ramp before obstacles");
+    def->tooltip = L("If enabled, PrusaSlicer detects obstacles along the travel path and makes the slope steeper "
+                     "in case an obstacle might be hit during the initial phase of the travel.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools{false});
+
+    def = this->add("retract_lift", coFloats);
+    def->label = L("Lift height");
+    def->tooltip = L("Lift height applied before travel.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max_literal = 1000;
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionFloats{0.});
 
     def = this->add("retract_lift_above", coFloats);
     def->label = L("Above Z");
@@ -2364,7 +2400,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats { 0. });
 
     def = this->add("retract_restart_extra", coFloats);
-    def->label = L("Extra length on restart");
+    def->label = L("Deretraction extra length");
     def->tooltip = L("When the retraction is compensated after the travel move, the extruder will push "
                    "this additional amount of filament. This setting is rarely needed.");
     def->sidetext = L("mm");
@@ -3453,11 +3489,12 @@ void PrintConfigDef::init_fff_params()
     for (const char *opt_key : {
         // floats
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed",
+        "travel_max_lift",
         "deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_length_toolchange", "retract_restart_extra_toolchange",
         // bools
-        "retract_layer_change", "wipe",
+        "retract_layer_change", "wipe", "travel_lift_before_obstacle", "travel_ramping_lift",
         // percents
-        "retract_before_wipe"}) {
+        "retract_before_wipe", "travel_slope"}) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add_nullable(std::string("filament_") + opt_key, it_opt->second.type);
@@ -3482,6 +3519,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "nozzle_diameter", "min_layer_height", "max_layer_height", "extruder_offset",
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed",
         "retract_before_wipe", "retract_restart_extra", "retract_before_travel", "wipe",
+        "travel_slope", "travel_max_lift", "travel_ramping_lift", "travel_lift_before_obstacle",
         "retract_layer_change", "retract_length_toolchange", "retract_restart_extra_toolchange", "extruder_colour",
         "default_filament_profile"
     };
@@ -3499,6 +3537,10 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_restart_extra",
         "retract_restart_extra_toolchange",
         "retract_speed",
+        "travel_lift_before_obstacle",
+        "travel_max_lift",
+        "travel_ramping_lift",
+        "travel_slope",
         "wipe"
     };
     assert(std::is_sorted(m_extruder_retract_keys.begin(), m_extruder_retract_keys.end()));
@@ -4282,6 +4324,7 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "ensure_vertical_shell_thickness",
     // Disabled in 2.6.0-alpha6, this option is problematic
     "infill_only_where_needed",
+    "gcode_binary" // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)

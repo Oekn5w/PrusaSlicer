@@ -474,7 +474,9 @@ struct WipeTowerData
         used_filament.clear();
         number_of_toolchanges = -1;
         depth = 0.f;
+        z_and_depth_pairs.clear();
         brim_width = 0.f;
+        height = 0.f;
         width = 0.f;
         first_layer_height = 0.f;
         cone_angle = 0.f;
@@ -503,6 +505,7 @@ struct PrintStatistics
     double                          total_weight;
     double                          total_wipe_tower_cost;
     double                          total_wipe_tower_filament;
+    double                          total_wipe_tower_filament_weight;
     std::vector<unsigned int>       printing_extruders;
     unsigned int                    initial_extruder_id;
     std::string                     initial_filament_type;
@@ -524,6 +527,7 @@ struct PrintStatistics
         total_weight           = 0.;
         total_wipe_tower_cost  = 0.;
         total_wipe_tower_filament = 0.;
+        total_wipe_tower_filament_weight = 0.;
         initial_extruder_id    = 0;
         initial_filament_type.clear();
         printing_filament_types.clear();
@@ -545,6 +549,8 @@ struct PrintStatistics
     static const std::string TotalFilamentCost;
     static const std::string TotalFilamentCostMask;
     static const std::string TotalFilamentCostValueMask;
+    static const std::string TotalFilamentUsedWipeTower;
+    static const std::string TotalFilamentUsedWipeTowerValueMask;
 };
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;

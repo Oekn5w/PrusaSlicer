@@ -492,9 +492,10 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
 
                         const size_t ref_id = (i == 0) ? 0 : i - 1;
                         const size_t first_line_id = (i == 0) ? *m_cache_range.min :
-                            (*m_cache_range.min - 1 >= cumulative_lines_counts[ref_id]) ? *m_cache_range.min - cumulative_lines_counts[ref_id] : 1;
-                        const size_t last_line_id = (*m_cache_range.max - 1 <= cumulative_lines_counts[i]) ?
-                            (i == 0) ? *m_cache_range.max : *m_cache_range.max - cumulative_lines_counts[ref_id] : m_lines_ends[i].size() - 1;
+                            (*m_cache_range.min > cumulative_lines_counts[ref_id]) ? *m_cache_range.min - cumulative_lines_counts[ref_id] : 1;
+                        const size_t last_line_id = (*m_cache_range.max <= cumulative_lines_counts[i]) ?
+                            (i == 0) ? *m_cache_range.max : *m_cache_range.max - cumulative_lines_counts[ref_id] : m_lines_ends[i].size();
+                        assert(last_line_id >= first_line_id);
 
                         for (size_t j = first_line_id; j <= last_line_id; ++j) {
                             const size_t begin = (j == 1) ? 0 : m_lines_ends[i][j - 2];
@@ -2339,9 +2340,18 @@ void GCodeViewer::load_shells(const Print& print)
         return;
 
     // adds objects' volumes 
-    int object_id = 0;
     for (const PrintObject* obj : print.objects()) {
         const ModelObject* model_obj = obj->model_object();
+        int object_id = -1;
+        const ModelObjectPtrs model_objects = wxGetApp().plater()->model().objects;
+        for (int i = 0; i < static_cast<int>(model_objects.size()); ++i) {
+            if (model_obj->id() == model_objects[i]->id()) {
+                object_id = i;
+                break;
+            }
+        }
+        if (object_id == -1)
+            continue;
 
         std::vector<int> instance_ids(model_obj->instances.size());
         for (int i = 0; i < (int)model_obj->instances.size(); ++i) {
@@ -2360,8 +2370,6 @@ void GCodeViewer::load_shells(const Print& print)
                 v->set_volume_offset(v->get_volume_offset() + z_offset);
             }
         }
-
-        ++object_id;
     }
 
     wxGetApp().plater()->get_current_canvas3D()->check_volumes_outside_state(m_shells.volumes);
