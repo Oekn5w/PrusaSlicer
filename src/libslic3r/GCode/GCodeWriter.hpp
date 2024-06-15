@@ -52,6 +52,7 @@ public:
     std::string postamble() const;
     std::string set_temperature(unsigned int temperature, bool wait = false, int tool = -1) const;
     std::string set_bed_temperature(unsigned int temperature, bool wait = false);
+    std::string set_chamber_temperature(unsigned int temperature, bool wait, bool accurate) const;
     std::string set_print_acceleration(unsigned int acceleration)   { return set_acceleration_internal(Acceleration::Print, acceleration); }
     std::string set_travel_acceleration(unsigned int acceleration)  { return set_acceleration_internal(Acceleration::Travel, acceleration); }
     std::string reset_e(bool force = false);
@@ -176,6 +177,8 @@ public:
         { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS) }; }
     static Vec3d                                  quantize(const Vec3d &pt)
         { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS), quantize(pt.z(), XYZF_EXPORT_DIGITS) }; }
+    static Vec2d                                  quantize(const Vec2f &pt)
+        { return { quantize(double(pt.x()), XYZF_EXPORT_DIGITS), quantize(double(pt.y()), XYZF_EXPORT_DIGITS) }; }
 
     void emit_axis(const char axis, const double v, size_t digits);
 
